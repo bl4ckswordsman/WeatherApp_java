@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Weather</string>
+    <string name="longitudeLabel">Longitude</string>
+    <string name="latitudeLabel">Latitude</string>
+    <string name="refreshButtLabel">Refresh</string>
+    <string name="weather_condition_image">Weather condition image</string>
+    <string name="get_weatherButtLabel">Get Weather</string>
+</resources>
