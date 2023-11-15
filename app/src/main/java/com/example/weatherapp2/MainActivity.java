@@ -3,7 +3,8 @@ package com.example.weatherapp2;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
-import android.text.TextUtils;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -15,16 +16,21 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import java.io.IOException;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity implements WeatherDataCallback {
+public class MainActivity extends AppCompatActivity {
 
     private TextView locationTextView;
     private TextView temperatureTextView;
     private TextView conditionTextView;
     private ImageView conditionImageView;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,76 +44,57 @@ public class MainActivity extends AppCompatActivity implements WeatherDataCallba
 
         String defaultLatitude = "62.392899";
         String defaultLongitude = "17.285322";
-        AtomicReference<WeatherDataFetcher> weatherDataFetcher = new AtomicReference<>(new WeatherDataFetcher());
-        weatherDataFetcher.get().fetchWeatherData(defaultLatitude, defaultLongitude, this);
+
+        fetchWeatherData(defaultLatitude, defaultLongitude);
 
         MaterialToolbar toolbar = findViewById(R.id.materialToolbar2);
         toolbar.setTitle(R.string.app_name);
         setSupportActionBar(toolbar);
 
-        // Initialize the SwipeRefreshLayout
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
 
-        // Set an OnRefreshListener to handle the refresh action
-        swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
-            @Override
-            public void onRefresh() {
-                //String defaultLatitude = "40";
-                //String defaultLongitude = "20";
-                // Recreate the main activity
-                WeatherDataFetcher weatherDataFetcher = new WeatherDataFetcher();
-                weatherDataFetcher.fetchWeatherData(defaultLatitude, defaultLongitude, MainActivity.this);
-            }
-        });
+        swipeRefreshLayout.setOnRefreshListener(() -> fetchWeatherData(defaultLatitude, defaultLongitude));
 
         Button refreshButton = findViewById(R.id.refreshButton);
-        refreshButton.setOnClickListener(v -> {
-            // Recreate the main activity
-            weatherDataFetcher.set(new WeatherDataFetcher());
-            weatherDataFetcher.get().fetchWeatherData(defaultLatitude, defaultLongitude, MainActivity.this);
-        });
+        refreshButton.setOnClickListener(v -> fetchWeatherData(defaultLatitude, defaultLongitude));
 
         Button getWeatherButton = findViewById(R.id.getWeatherButton);
         getWeatherButton.setOnClickListener(v -> {
-            String latitude = ((TextInputEditText) findViewById(R.id.latInput)).getText().toString();
-            String longitude = ((TextInputEditText) findViewById(R.id.longInput)).getText().toString();
+            String latitude = Objects.requireNonNull(((TextInputEditText) findViewById(R.id.latInput)).getText()).toString();
+            String longitude = Objects.requireNonNull(((TextInputEditText) findViewById(R.id.longInput)).getText()).toString();
 
-            // Check if latitude and longitude are not empty before fetching data
-            if (!TextUtils.isEmpty(latitude) && !TextUtils.isEmpty(longitude)) {
-                weatherDataFetcher.set(new WeatherDataFetcher());
-                weatherDataFetcher.get().fetchWeatherData(latitude, longitude, MainActivity.this);
+            if (!latitude.isEmpty() && !longitude.isEmpty()) {
+                fetchWeatherData(latitude, longitude);
             } else {
                 Toast.makeText(this, "Please enter latitude and longitude", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    @Override
-    public void onWeatherDataFetched(WeatherData weatherData) {
+    private void fetchWeatherData(String latitude, String longitude) {
+        executorService.execute(() -> {
+            try {
+                WeatherData weatherData = new WeatherData().fetch(latitude, longitude);
+                handler.post(() -> updateUI(weatherData));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void updateUI(WeatherData weatherData) {
         if (weatherData != null) {
             locationTextView.setText(weatherData.getLocation());
             temperatureTextView.setText(String.format(Locale.getDefault(), "%.1f°C", weatherData.getTemperature()));
             conditionTextView.setText(weatherData.getWeatherCondition());
 
-            // Load weather condition image using a library like Glide or Picasso
-            String imageUrl = weatherData.getWeatherConditionImg();
-
-            // Using Glide for image loading
             Glide.with(this)
-                    .asBitmap() // Treat the resource as a static image
-                    .load(imageUrl)
+                    .asBitmap()
+                    .load(weatherData.getWeatherConditionImg())
                     .into(conditionImageView);
-            // Stop the swipe refresh animation
+
             swipeRefreshLayout.setRefreshing(false);
             Toast.makeText(this, "Weather data fetched!", Toast.LENGTH_SHORT).show();
-        } else {
-            // Handle error case if needed
         }
-    }
-
-    @Override
-    public void onError() {
-        // Handle error case if needed
-        swipeRefreshLayout.setRefreshing(false);
     }
 }

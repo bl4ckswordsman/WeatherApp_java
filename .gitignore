@@ -14,3 +14,6 @@
 .cxx
 local.properties
 /.WEB_APP_VARIANT/demoW4/src/test/
+/app/src/androidTest/java/com/example/weatherapp2/ExampleInstrumentedTest.java
+/app/src/test/java/com/example/weatherapp2/ExampleUnitTest.java
+/app/proguard-rules.pro
